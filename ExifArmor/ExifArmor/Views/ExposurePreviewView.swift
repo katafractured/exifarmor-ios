@@ -10,51 +10,49 @@ struct ExposurePreviewView: View {
     @State private var selectedPhotoIndex = 0
     @State private var showStripOptions = false
 
-    private var currentPhoto: PhotoMetadata? {
-        guard selectedPhotoIndex < viewModel.analyzedPhotos.count else { return nil }
-        return viewModel.analyzedPhotos[selectedPhotoIndex]
-    }
-
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Photo carousel
-                photoCarousel
+                if !viewModel.analyzedPhotos.isEmpty {
+                    photoCarousel
 
-                if let photo = currentPhoto {
-                    // Privacy score banner
-                    privacyScoreBanner(photo)
+                    if let photo = currentPhoto {
+                        // Privacy score banner
+                        privacyScoreBanner(photo)
 
-                    // Metadata sections
-                    VStack(spacing: 16) {
-                        if photo.hasLocation {
-                            locationCard(photo)
+                        // Metadata sections
+                        VStack(spacing: 16) {
+                            if photo.hasLocation {
+                                locationCard(photo)
+                            }
+
+                            if photo.hasDeviceInfo {
+                                deviceCard(photo)
+                            }
+
+                            if photo.hasDateTime {
+                                dateTimeCard(photo)
+                            }
+
+                            if photo.focalLength != nil || photo.aperture != nil {
+                                cameraCard(photo)
+                            }
                         }
-
-                        if photo.hasDeviceInfo {
-                            deviceCard(photo)
-                        }
-
-                        if photo.hasDateTime {
-                            dateTimeCard(photo)
-                        }
-
-                        if photo.focalLength != nil || photo.aperture != nil {
-                            cameraCard(photo)
-                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
                 }
 
                 if !viewModel.analyzedVideos.isEmpty {
+                    // Privacy score banner
                     VStack(spacing: 16) {
                         ForEach(viewModel.analyzedVideos) { video in
+                            videoPrivacyBanner(video)
                             VideoMetadataCard(video: video)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, currentPhoto == nil ? 16 : 0)
+                    .padding(.top, 16)
                 }
 
                 // Action buttons
@@ -80,6 +78,11 @@ struct ExposurePreviewView: View {
     }
 
     // MARK: - Photo Carousel
+
+    private var currentPhoto: PhotoMetadata? {
+        guard selectedPhotoIndex < viewModel.analyzedPhotos.count else { return nil }
+        return viewModel.analyzedPhotos[selectedPhotoIndex]
+    }
 
     private var photoCarousel: some View {
         TabView(selection: $selectedPhotoIndex) {
@@ -136,6 +139,30 @@ struct ExposurePreviewView: View {
         if score >= 7 { return Color("WarningRed") }
         if score >= 4 { return Color("AccentGold") }
         return Color("SuccessGreen")
+    }
+
+    private func videoPrivacyBanner(_ video: VideoMetadata) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: video.privacyScore >= 7 ? "exclamationmark.triangle.fill" :
+                    video.privacyScore >= 4 ? "exclamationmark.circle.fill" : "checkmark.shield.fill")
+                .font(.title2)
+                .foregroundStyle(scoreColor(video.privacyScore))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Video Privacy Risk: \(video.privacyScore)/10")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(scoreColor(video.privacyScore))
+
+                Text("\(video.exposedFieldCount) data fields exposed")
+                    .font(.caption)
+                    .foregroundStyle(Color("TextSecondary"))
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(scoreColor(video.privacyScore).opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Location Card

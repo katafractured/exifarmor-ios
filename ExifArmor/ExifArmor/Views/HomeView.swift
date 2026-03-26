@@ -153,12 +153,16 @@ struct HomeView: View {
 
     private var loadingView: some View {
         VStack(spacing: 20) {
-            ProgressView()
-                .controlSize(.large)
+            ProgressView(value: viewModel.effectiveProgress, total: Double(max(viewModel.totalCount, 1)))
                 .tint(Color("AccentCyan"))
+                .padding(.horizontal, 60)
 
-            Text("Scanning \(viewModel.processedCount)/\(viewModel.totalCount) items…")
+            Text(viewModel.statusMessage.isEmpty ? "Scanning \(viewModel.processedCount)/\(viewModel.totalCount) items…" : viewModel.statusMessage)
                 .font(.subheadline)
+                .foregroundStyle(Color("TextSecondary"))
+
+            Text("\(viewModel.processedCount)/\(viewModel.totalCount)")
+                .font(.caption)
                 .foregroundStyle(Color("TextSecondary"))
         }
     }
@@ -167,12 +171,12 @@ struct HomeView: View {
 
     private var strippingView: some View {
         VStack(spacing: 20) {
-            ProgressView(value: Double(viewModel.processedCount),
+            ProgressView(value: viewModel.effectiveProgress,
                          total: Double(viewModel.totalCount))
                 .tint(Color("AccentCyan"))
                 .padding(.horizontal, 60)
 
-            Text("Stripping metadata…")
+            Text(viewModel.statusMessage.isEmpty ? "Stripping metadata…" : viewModel.statusMessage)
                 .font(.subheadline)
                 .foregroundStyle(Color("TextSecondary"))
 

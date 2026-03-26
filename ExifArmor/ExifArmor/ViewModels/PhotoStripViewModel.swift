@@ -53,6 +53,8 @@ final class PhotoStripViewModel {
     var videoStripResults: [URL] = []
     var stripOptions: StripOptions = .all
     var showStripOptions: Bool = false
+    var statusMessage: String = ""
+    var currentItemProgress: Double = 0
     private var importedVideoURLs: [URL] = []
     private var sharedItemURLs: [URL] = []
 
@@ -75,51 +77,56 @@ final class PhotoStripViewModel {
             stripResults = []
             videoStripResults = []
             processedCount = 0
+            currentItemProgress = 0
+            statusMessage = "Scanning selected media…"
             totalCount = selectedItems.count
         }
 
         var photoResults: [PhotoMetadata] = []
         var videoResults: [VideoMetadata] = []
 
-        for item in selectedItems {
-            guard !isMovieItem(item) else {
-                await MainActor.run {
-                    processedCount += 1
-                }
-                continue
+        for (index, item) in selectedItems.enumerated() {
+            await MainActor.run {
+                currentItemProgress = 0
+                statusMessage = isMovieItem(item)
+                    ? "Importing video \(index + 1) of \(selectedItems.count)…"
+                    : "Scanning photo \(index + 1) of \(selectedItems.count)…"
             }
 
-            do {
-                guard let data = try await item.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data)
-                else { continue }
+            if isMovieItem(item) {
+                if let pickedFile = try? await item.loadTransferable(type: PickedVideoFile.self) {
+                    importedVideoURLs.append(pickedFile.url)
+                    await MainActor.run {
+                        statusMessage = "Reading video metadata \(index + 1) of \(selectedItems.count)…"
+                    }
+                    let videoMeta = await VideoMetadataService.extractMetadata(from: pickedFile.url)
+                    videoResults.append(videoMeta)
+                }
+            } else {
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data)
+                    else { continue }
 
-                let isLivePhoto = isLivePhotoItem(item)
-                var metadata = MetadataService.extractMetadata(from: data, image: image)
-                metadata.isLivePhoto = isLivePhoto
-                photoResults.append(metadata)
-            } catch {
-                // Skip photos that fail to load
+                    let isLivePhoto = isLivePhotoItem(item)
+                    var metadata = MetadataService.extractMetadata(from: data, image: image)
+                    metadata.isLivePhoto = isLivePhoto
+                    photoResults.append(metadata)
+                } catch {
+                    // Skip photos that fail to load
+                }
             }
 
             await MainActor.run {
+                currentItemProgress = 0
                 processedCount += 1
-            }
-        }
-
-        for item in selectedItems {
-            guard isMovieItem(item) else { continue }
-
-            if let pickedFile = try? await item.loadTransferable(type: PickedVideoFile.self) {
-                importedVideoURLs.append(pickedFile.url)
-                let videoMeta = await VideoMetadataService.extractMetadata(from: pickedFile.url)
-                videoResults.append(videoMeta)
             }
         }
 
         await MainActor.run {
             analyzedPhotos = photoResults
             analyzedVideos = videoResults
+            statusMessage = ""
             phase = (photoResults.isEmpty && videoResults.isEmpty) ? .error("Could not load any media") : .preview
         }
     }
@@ -132,12 +139,18 @@ final class PhotoStripViewModel {
             stripResults = []
             videoStripResults = []
             processedCount = 0
+            currentItemProgress = 0
+            statusMessage = "Preparing media cleanup…"
             totalCount = analyzedPhotos.count + (stripOptions.includeVideos ? analyzedVideos.count : 0)
         }
 
         var results: [StripResult] = []
 
-        for metadata in analyzedPhotos {
+        for (index, metadata) in analyzedPhotos.enumerated() {
+            await MainActor.run {
+                currentItemProgress = 0
+                statusMessage = "Cleaning photo \(index + 1) of \(totalCount)…"
+            }
             let fieldsToRemove = StripService.countFieldsToRemove(
                 from: metadata, options: stripOptions
             )
@@ -157,6 +170,7 @@ final class PhotoStripViewModel {
             }
 
             await MainActor.run {
+                currentItemProgress = 0
                 processedCount += 1
             }
         }
@@ -165,6 +179,7 @@ final class PhotoStripViewModel {
 
         await MainActor.run {
             stripResults = results
+            statusMessage = ""
             phase = (results.isEmpty && videoStripResults.isEmpty) ? .error("Failed to strip media") : .done
         }
     }
@@ -172,14 +187,31 @@ final class PhotoStripViewModel {
     func stripAllVideos() async {
         guard stripOptions.includeVideos else { return }
 
-        for meta in analyzedVideos {
-            if let cleanURL = try? await VideoStripService.stripMetadata(from: meta.fileURL) {
+        let videoOffset = analyzedPhotos.count
+        for (index, meta) in analyzedVideos.enumerated() {
+            await MainActor.run {
+                currentItemProgress = 0
+                statusMessage = "Cleaning video \(index + 1) of \(analyzedVideos.count)…"
+            }
+
+            if let cleanURL = try? await VideoStripService.stripMetadata(
+                from: meta.fileURL,
+                onProgress: { [weak self] progress in
+                    await MainActor.run {
+                        self?.currentItemProgress = progress
+                        self?.statusMessage = "Cleaning video \(index + 1) of \(self?.analyzedVideos.count ?? 0)… \(Int(progress * 100))%"
+                    }
+                }
+            ) {
                 await MainActor.run {
                     videoStripResults.append(cleanURL)
+                    currentItemProgress = 0
                     processedCount += 1
                 }
             } else {
                 await MainActor.run {
+                    currentItemProgress = 0
+                    statusMessage = "Video cleanup failed for item \(videoOffset + index + 1)."
                     processedCount += 1
                 }
             }
@@ -268,6 +300,8 @@ final class PhotoStripViewModel {
         stripResults = []
         videoStripResults = []
         processedCount = 0
+        currentItemProgress = 0
+        statusMessage = ""
         totalCount = 0
         applySavedDefaultStripMode()
     }
@@ -285,6 +319,11 @@ final class PhotoStripViewModel {
 
     var totalProcessedMediaCount: Int {
         stripResults.count + videoStripResults.count
+    }
+
+    var effectiveProgress: Double {
+        guard totalCount > 0 else { return 0 }
+        return min(Double(processedCount) + currentItemProgress, Double(totalCount))
     }
 
     func applySavedDefaultStripMode() {
