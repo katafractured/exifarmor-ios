@@ -102,9 +102,11 @@ struct StripService {
             return nil
         }
 
-        // Re-write the raw image with only the cleaned properties. Using
-        // AddImageFromSource preserves metadata from the original source even when
-        // keys are removed from the property dictionary.
+        // Re-write the raw image with only the cleaned properties.
+        // CGImageDestinationAddImageFromSource is NOT used here because it bleeds
+        // source metadata through even when keys are removed from the properties
+        // dictionary. Using AddImage with the decoded CGImage ensures only the
+        // explicitly provided mutableProperties are written to the output.
         CGImageDestinationAddImage(destination, image, mutableProperties as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else {

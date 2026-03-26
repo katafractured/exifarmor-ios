@@ -1,4 +1,14 @@
 {
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
   "identifier" : "BFAF7E4C-85E2-4C5A-A064-9A8D0EC1A001",
   "nonRenewingSubscriptions" : [
 
@@ -67,11 +77,16 @@
   ],
   "settings" : {
     "_applicationInternalID" : "2D2824C9-95A5-4B98-A0B9-BA147B4BA001",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
     "_developerTeamID" : "KATAFRACT",
+    "_disableDialogs" : false,
     "_failTransactionsEnabled" : false,
     "_lastSynchronizedDate" : 0,
     "_locale" : "en_US",
     "_renewalBillingGracePeriodEnabled" : false,
+    "_renewalBillingIssuesEnabled" : false,
     "_storefront" : "USA",
     "_storeKitErrors" : [
 
@@ -82,7 +97,7 @@
 
   ],
   "version" : {
-    "major" : 3,
+    "major" : 5,
     "minor" : 0
   }
 }
