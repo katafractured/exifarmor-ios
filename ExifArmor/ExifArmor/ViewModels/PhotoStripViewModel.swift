@@ -69,6 +69,8 @@ final class PhotoStripViewModel {
     // Batch progress
     var processedCount: Int = 0
     var totalCount: Int = 0
+    var livePhotoCount: Int = 0
+    var videoStripFailures: Int = 0
 
     // MARK: - Load Selected Photos
 
@@ -88,6 +90,8 @@ final class PhotoStripViewModel {
             currentItemProgress = 0
             statusMessage = "Scanning selected media…"
             totalCount = selectedItems.count
+            livePhotoCount = 0
+            videoStripFailures = 0
         }
 
         var photoResults: [PhotoMetadata] = []
@@ -126,6 +130,11 @@ final class PhotoStripViewModel {
                     else { continue }
 
                     let isLivePhoto = isLivePhotoItem(item)
+                    if isLivePhoto {
+                        await MainActor.run {
+                            self.livePhotoCount += 1
+                        }
+                    }
                     var metadata = MetadataService.extractMetadata(from: data, image: image)
                     metadata.isLivePhoto = isLivePhoto
                     photoResults.append(metadata)
@@ -229,6 +238,7 @@ final class PhotoStripViewModel {
                 }
             } else {
                 await MainActor.run {
+                    videoStripFailures += 1
                     currentItemProgress = 0
                     statusMessage = "Video cleanup failed for item \(videoOffset + index + 1)."
                     processedCount += 1
@@ -328,6 +338,8 @@ final class PhotoStripViewModel {
         currentItemProgress = 0
         statusMessage = ""
         totalCount = 0
+        livePhotoCount = 0
+        videoStripFailures = 0
         applySavedDefaultStripMode()
     }
 

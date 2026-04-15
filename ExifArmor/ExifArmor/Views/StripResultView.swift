@@ -55,6 +55,19 @@ struct StripResultView: View {
                 // Cleaned photos grid
                 cleanedPhotosGrid
 
+                if viewModel.videoStripFailures > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(Color("AccentGold"))
+                        Text("\(viewModel.videoStripFailures) video(s) could not be cleaned.")
+                            .font(.caption)
+                            .foregroundStyle(Color("TextSecondary"))
+                    }
+                    .padding(12)
+                    .background(Color("CardBackground"))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+
                 if !viewModel.videoStripResults.isEmpty {
                     cleanedVideosGrid
                 }
