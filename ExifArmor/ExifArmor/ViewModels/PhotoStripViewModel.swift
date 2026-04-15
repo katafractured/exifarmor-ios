@@ -221,26 +221,27 @@ final class PhotoStripViewModel {
                 statusMessage = "Cleaning video \(index + 1) of \(totalVideos)…"
             }
 
-            if let cleanURL = try? await VideoStripService.stripMetadata(
-                from: meta.fileURL,
-                onProgress: { [weak viewModel = self, index, totalVideos] progress in
-                    await viewModel?.updateVideoProgress(
-                        itemIndex: index,
-                        totalVideos: totalVideos,
-                        progress: progress
-                    )
-                }
-            ) {
+            do {
+                let cleanURL = try await VideoStripService.stripMetadata(
+                    from: meta.fileURL,
+                    onProgress: { [weak viewModel = self, index, totalVideos] progress in
+                        await viewModel?.updateVideoProgress(
+                            itemIndex: index,
+                            totalVideos: totalVideos,
+                            progress: progress
+                        )
+                    }
+                )
                 await MainActor.run {
                     videoStripResults.append(cleanURL)
                     currentItemProgress = 0
                     processedCount += 1
                 }
-            } else {
+            } catch {
                 await MainActor.run {
                     videoStripFailures += 1
                     currentItemProgress = 0
-                    statusMessage = "Video cleanup failed for item \(videoOffset + index + 1)."
+                    statusMessage = "Video cleanup failed for item \(videoOffset + index + 1): \(error.localizedDescription)"
                     processedCount += 1
                 }
             }

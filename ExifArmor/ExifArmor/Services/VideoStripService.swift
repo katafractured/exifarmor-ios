@@ -6,6 +6,7 @@ struct VideoStripService {
         case exportFailed(String?)
         case unsupportedFormat
         case cancelled
+        case exportTimeout
 
         var errorDescription: String? {
             switch self {
@@ -15,6 +16,8 @@ struct VideoStripService {
                 return "This video format is not supported."
             case .cancelled:
                 return "Export was cancelled."
+            case .exportTimeout:
+                return "Video export timed out — try a shorter clip or lower resolution."
             }
         }
     }
@@ -66,7 +69,22 @@ struct VideoStripService {
 
         do {
             await onProgress?(0)
-            try await session.export(to: tmpURL, as: outputFileType)
+            
+            // Wrap export in a timeout task group
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    try await session.export(to: tmpURL, as: outputFileType)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 120 * 1_000_000_000) // 120 seconds
+                    throw VideoStripError.exportTimeout
+                }
+                
+                // First one to finish wins
+                try await group.next()
+                group.cancelAll()
+            }
+            
             progressTask.cancel()
             await onProgress?(1)
             return tmpURL
@@ -77,6 +95,9 @@ struct VideoStripService {
         } catch {
             progressTask.cancel()
             try? FileManager.default.removeItem(at: tmpURL)
+            if error is VideoStripError {
+                throw error
+            }
             throw VideoStripError.exportFailed(error.localizedDescription)
         }
     }
