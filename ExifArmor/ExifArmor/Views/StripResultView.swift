@@ -332,9 +332,11 @@ struct StripResultView: View {
 private struct VideoResultThumbnail: View {
     let url: URL
 
+    @State private var thumbnail: UIImage?
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            if let image = thumbnailImage {
+            if let image = thumbnail {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -358,38 +360,22 @@ private struct VideoResultThumbnail: View {
                 .clipShape(Circle())
                 .padding(4)
         }
+        .task(id: url) {
+            thumbnail = await Self.loadThumbnail(from: url)
+        }
     }
 
-    private var thumbnailImage: UIImage? {
+    /// Loads a video thumbnail off the main actor. Returns nil on any failure.
+    nonisolated private static func loadThumbnail(from url: URL) async -> UIImage? {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-
-        guard let cgImage = try? awaitThumbnailImage(from: generator) else {
+        do {
+            let cgImage = try await generator.image(at: .zero).image
+            return UIImage(cgImage: cgImage)
+        } catch {
             return nil
         }
-
-        return UIImage(cgImage: cgImage)
-    }
-
-    private func awaitThumbnailImage(from generator: AVAssetImageGenerator) throws -> CGImage {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<CGImage, Error>?
-
-        Task {
-            do {
-                let image = try await generator.image(at: .zero).image
-                result = .success(image)
-            } catch {
-                result = .failure(error)
-            }
-            semaphore.signal()
-        }
-
-        semaphore.wait()
-        return try result?.get() ?? {
-            throw NSError(domain: "ExifArmor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Thumbnail generation failed"])
-        }()
     }
 }
 
