@@ -52,8 +52,10 @@ struct StripResultView: View {
 
                 metadataOutcomeSummary
 
-                // Cleaned photos grid
-                cleanedPhotosGrid
+                // Cleaned photos grid — only shown when photos were actually stripped
+                if !viewModel.stripResults.isEmpty {
+                    cleanedPhotosGrid
+                }
 
                 if viewModel.videoStripFailures > 0 {
                     HStack(spacing: 8) {
@@ -99,7 +101,7 @@ struct StripResultView: View {
                 .scaledToFit()
                 .frame(width: 120, height: 120)
 
-            Text("Photos Cleaned!")
+            Text(successHeadline)
                 .font(.title2.weight(.bold))
                 .foregroundStyle(Color("TextPrimary"))
 
@@ -109,19 +111,48 @@ struct StripResultView: View {
         }
     }
 
+    /// Headline adapts to what was actually cleaned: photos only, videos only,
+    /// or both. Uses singular/plural based on count.
+    private var successHeadline: String {
+        let photoCount = viewModel.stripResults.count
+        let videoCount = viewModel.videoStripResults.count
+
+        switch (photoCount, videoCount) {
+        case (0, 0):
+            return "Cleaned!"
+        case (_, 0):
+            return photoCount == 1 ? "Photo Cleaned!" : "Photos Cleaned!"
+        case (0, _):
+            return videoCount == 1 ? "Video Cleaned!" : "Videos Cleaned!"
+        default:
+            return "Media Cleaned!"
+        }
+    }
+
     // MARK: - Stats
 
     private var statsSummary: some View {
-        HStack(spacing: 0) {
-            statItem(
-                value: "\(viewModel.stripResults.count)",
-                label: viewModel.videoStripResults.isEmpty ? "Photos" : "Photos",
-                icon: "photo.fill"
-            )
+        let photoCount = viewModel.stripResults.count
+        let videoCount = viewModel.videoStripResults.count
 
-            Divider()
-                .frame(height: 40)
-                .background(Color("TextSecondary").opacity(0.3))
+        return HStack(spacing: 0) {
+            if photoCount > 0 {
+                statItem(
+                    value: "\(photoCount)",
+                    label: "Photos",
+                    icon: "photo.fill"
+                )
+                statDivider
+            }
+
+            if videoCount > 0 {
+                statItem(
+                    value: "\(videoCount)",
+                    label: "Videos",
+                    icon: "video.fill"
+                )
+                statDivider
+            }
 
             statItem(
                 value: "\(viewModel.totalFieldsRemoved)",
@@ -130,9 +161,7 @@ struct StripResultView: View {
             )
 
             if viewModel.hadLocationData {
-                Divider()
-                    .frame(height: 40)
-                    .background(Color("TextSecondary").opacity(0.3))
+                statDivider
 
                 statItem(
                     value: "✓",
@@ -144,6 +173,12 @@ struct StripResultView: View {
         .padding(.vertical, 16)
         .background(Color("CardBackground"))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var statDivider: some View {
+        Divider()
+            .frame(height: 40)
+            .background(Color("TextSecondary").opacity(0.3))
     }
 
     private var metadataOutcomeSummary: some View {

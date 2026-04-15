@@ -57,7 +57,32 @@ struct HomeView: View {
         .alert("Saved!", isPresented: $showSavedAlert) {
             Button("OK") { viewModel.reset() }
         } message: {
-            Text("\(viewModel.totalProcessedMediaCount) cleaned item(s) saved to your library.")
+            Text(savedAlertMessage)
+        }
+    }
+
+    /// Savedalert body — splits photo and video counts inline without
+    /// introducing a line break. Handles photos-only, videos-only, and mixed.
+    private var savedAlertMessage: String {
+        let photoCount = viewModel.stripResults.count
+        let videoCount = viewModel.videoStripResults.count
+
+        let photoPart = photoCount > 0
+            ? "\(photoCount) \(photoCount == 1 ? "photo" : "photos")"
+            : ""
+        let videoPart = videoCount > 0
+            ? "\(videoCount) \(videoCount == 1 ? "video" : "videos")"
+            : ""
+
+        switch (photoPart.isEmpty, videoPart.isEmpty) {
+        case (false, false):
+            return "\(photoPart) and \(videoPart) saved to your library."
+        case (false, true):
+            return "\(photoPart) saved to your library."
+        case (true, false):
+            return "\(videoPart) saved to your library."
+        case (true, true):
+            return "Saved to your library."
         }
     }
 
