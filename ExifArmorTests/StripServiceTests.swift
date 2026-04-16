@@ -126,8 +126,8 @@ final class StripServiceTests: XCTestCase {
         // Verify it's still a valid image
         let image = UIImage(data: stripped)
         XCTAssertNotNil(image, "Stripped data should produce a valid UIImage")
-        XCTAssertEqual(image?.size.width, 100, accuracy: 1)
-        XCTAssertEqual(image?.size.height, 100, accuracy: 1)
+        XCTAssertEqual(image?.size.width, CGFloat(100), accuracy: 1.0)
+        XCTAssertEqual(image?.size.height, CGFloat(100), accuracy: 1.0)
     }
 
     func testStripAllDoesNotIncreaseFileSize() {

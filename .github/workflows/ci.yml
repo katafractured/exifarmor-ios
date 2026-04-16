@@ -122,7 +122,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Install Python deps
-        run: pip3 install PyJWT requests --quiet
+        run: pip3 install PyJWT requests --quiet --break-system-packages
 
       - name: Compute next build number
         run: |
