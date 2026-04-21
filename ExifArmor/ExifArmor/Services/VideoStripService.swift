@@ -87,16 +87,12 @@ struct VideoStripService {
         var progressTask: Task<Void, Never>?
         if #available(iOS 18.0, *) {
             progressTask = Task {
-                do {
-                    for try await state in session.states(updateInterval: 0.2) {
-                        guard !Task.isCancelled else { break }
-                        if case .exporting(let progress) = state {
-                            // Map 0→1 export progress to 0.25→1.0 overall progress
-                            await onProgress?(0.25 + progress.fractionCompleted * 0.75)
-                        }
+                for await state in session.states(updateInterval: 0.2) {
+                    guard !Task.isCancelled else { break }
+                    if case .exporting(let progress) = state {
+                        // Map 0→1 export progress to 0.25→1.0 overall progress
+                        await onProgress?(0.25 + progress.fractionCompleted * 0.75)
                     }
-                } catch {
-                    // Progress reporting is best-effort; ignore errors here.
                 }
             }
         }
