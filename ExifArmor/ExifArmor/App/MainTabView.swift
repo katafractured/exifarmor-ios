@@ -16,7 +16,7 @@ struct MainTabView: View {
                     SettingsView()
                 }
             }
-            .tint(Color("AccentCyan"))
+            .tint(Color.kataGold)
             .tabViewStyle(.sidebarAdaptable)
         } else {
             TabView(selection: $selectedTab) {
@@ -32,7 +32,7 @@ struct MainTabView: View {
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     .tag(2)
             }
-            .tint(Color("AccentCyan"))
+            .tint(Color.kataGold)
         }
     }
 }

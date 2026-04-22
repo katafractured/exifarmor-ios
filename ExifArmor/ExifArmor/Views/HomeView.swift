@@ -12,6 +12,9 @@ struct HomeView: View {
     @State private var showUpgradeSheet = false
     @State private var showShareSheet = false
     @State private var showSavedAlert = false
+    @State private var showStripConfirm = false
+    @State private var showSealSuccess = false
+    @State private var sealThumbnail: UIImage?
 
     var body: some View {
         ZStack {
@@ -54,6 +57,26 @@ struct HomeView: View {
                 ShareSheet(items: viewModel.shareItems())
             }
         }
+        .sheet(isPresented: $showStripConfirm) {
+            let count = viewModel.analyzedPhotos.count
+                + (viewModel.stripOptions.includeVideos ? viewModel.analyzedVideos.count : 0)
+            StripConfirmSheet(
+                photoCount: count,
+                onConfirm: {
+                    showStripConfirm = false
+                    executeStrip()
+                },
+                onCancel: {
+                    showStripConfirm = false
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $showSealSuccess) {
+            SealSuccessView(
+                thumbnail: sealThumbnail,
+                onDismiss: { showSealSuccess = false }
+            )
+        }
         .alert("Saved!", isPresented: $showSavedAlert) {
             Button("OK") { viewModel.reset() }
         } message: {
@@ -61,83 +84,31 @@ struct HomeView: View {
         }
     }
 
-    /// Savedalert body — splits photo and video counts inline without
-    /// introducing a line break. Handles photos-only, videos-only, and mixed.
+    // MARK: - Saved alert message
     private var savedAlertMessage: String {
         let photoCount = viewModel.stripResults.count
         let videoCount = viewModel.videoStripResults.count
-
         let photoPart = photoCount > 0
-            ? "\(photoCount) \(photoCount == 1 ? "photo" : "photos")"
-            : ""
+            ? "\(photoCount) \(photoCount == 1 ? "photo" : "photos")" : ""
         let videoPart = videoCount > 0
-            ? "\(videoCount) \(videoCount == 1 ? "video" : "videos")"
-            : ""
-
+            ? "\(videoCount) \(videoCount == 1 ? "video" : "videos")" : ""
         switch (photoPart.isEmpty, videoPart.isEmpty) {
-        case (false, false):
-            return "\(photoPart) and \(videoPart) saved to your library."
-        case (false, true):
-            return "\(photoPart) saved to your library."
-        case (true, false):
-            return "\(videoPart) saved to your library."
-        case (true, true):
-            return "Saved to your library."
+        case (false, false): return "\(photoPart) and \(videoPart) saved to your library."
+        case (false, true):  return "\(photoPart) saved to your library."
+        case (true, false):  return "\(videoPart) saved to your library."
+        default:             return "Saved to your library."
         }
     }
 
     // MARK: - iPad Sidebar
-
     private var pickerSidebar: some View {
         ZStack {
             Color("BackgroundDark").ignoresSafeArea()
             VStack(spacing: 24) {
                 Spacer()
-
-                Image("EmptyNoPhotos")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 140, height: 140)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-
-                VStack(spacing: 8) {
-                    Text("Select photos or videos")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color("TextPrimary"))
-
-                    Text("See what hidden data your media reveal")
-                        .font(.subheadline)
-                        .foregroundStyle(Color("TextSecondary"))
-                        .multilineTextAlignment(.center)
-                }
-
-                Button {
-                    showPhotoPicker = true
-                } label: {
-                    Label("Choose Photos", systemImage: "photo.on.rectangle.angled")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color("AccentCyan"))
-                        .foregroundStyle(Color("BackgroundDark"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
-                .padding(.horizontal, 20)
-
-                if !store.isPro {
-                    VStack(spacing: 6) {
-                        Text("\(freeTier.stripsRemaining) free strips remaining today")
-                            .font(.caption)
-                            .foregroundStyle(Color("TextSecondary"))
-
-                        Text("Pro unlocks the premium share extension, larger batch cleaning, and custom strip controls.")
-                            .font(.caption2)
-                            .foregroundStyle(Color("TextSecondary").opacity(0.85))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 16)
-                    }
-                }
-
+                brandedEmptyState
+                kataPickerButton
+                if !store.isPro { freeStripCounter }
                 Spacer()
             }
         }
@@ -149,7 +120,6 @@ struct HomeView: View {
     }
 
     // MARK: - iPad Detail
-
     private var ipadDetail: some View {
         ZStack {
             Color("BackgroundDark").ignoresSafeArea()
@@ -164,22 +134,17 @@ struct HomeView: View {
         VStack(spacing: 16) {
             Image(systemName: "eye.slash.circle")
                 .font(.system(size: 72))
-                .foregroundStyle(Color("AccentCyan").opacity(0.35))
-
+                .foregroundStyle(Color.kataGold.opacity(0.35))
             Text("Choose photos from the sidebar")
                 .font(.title3.weight(.medium))
                 .foregroundStyle(Color("TextSecondary"))
-
             Text("Your cleaned media will appear here")
                 .font(.subheadline)
                 .foregroundStyle(Color("TextSecondary").opacity(0.7))
         }
     }
 
-    // MARK: - Shared Phase Content
-
-    /// Renders the current workflow phase. `idleFallback` differs between iPhone (full picker UI)
-    /// and iPad (sidebar placeholder), so callers provide it.
+    // MARK: - Phase content
     @ViewBuilder
     private func phaseContent(idleFallback: some View) -> some View {
         switch viewModel.phase {
@@ -190,7 +155,7 @@ struct HomeView: View {
         case .preview:
             ExposurePreviewView(
                 viewModel: viewModel,
-                onStrip: handleStrip,
+                onStrip: handleStripTapped,
                 onCancel: { viewModel.reset() }
             )
         case .stripping:
@@ -207,8 +172,7 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Pro Toolbar Button
-
+    // MARK: - Pro toolbar button
     @ViewBuilder
     private var proButton: some View {
         if !store.isPro {
@@ -221,79 +185,117 @@ struct HomeView: View {
                     .padding(.vertical, 4)
                     .background(
                         LinearGradient(
-                            colors: [Color("AccentCyan"), Color("AccentMagenta")],
+                            colors: [Color.kataGold, Color.kataSapphire],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .clipShape(Capsule())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.kataIce)
             }
         }
     }
 
-    // MARK: - Idle State (iPhone)
+    // MARK: - Branded empty state (point 5)
+    private var brandedEmptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "photo")
+                .font(.system(size: 60))
+                .foregroundStyle(Color.kataGold.opacity(0.5))
+            Text("No photos sealed yet.")
+                .font(.kataDisplay(18))
+                .foregroundStyle(Color.kataIce)
+            Text("Pick one or more to strip EXIF metadata.")
+                .font(.kataBody(13))
+                .foregroundStyle(Color.kataGold.opacity(0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+    }
 
+    // MARK: - Kata-styled picker CTA button (point 3)
+    private var kataPickerButton: some View {
+        Button {
+            KataHaptic.tap.fire()
+            showPhotoPicker = true
+        } label: {
+            HStack {
+                Image(systemName: "photo.on.rectangle.angled")
+                Text("Choose Photos")
+            }
+            .font(.kataBody(16)).bold()
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(Color.kataSapphire)
+            .foregroundStyle(Color.kataIce)
+            .overlay(
+                Capsule().stroke(Color.kataGold.opacity(0.5), lineWidth: 0.5)
+            )
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, 40)
+    }
+
+    private var freeStripCounter: some View {
+        VStack(spacing: 6) {
+            Text("\(freeTier.stripsRemaining) free strips remaining today")
+                .font(.caption)
+                .foregroundStyle(Color("TextSecondary"))
+            Text("Pro unlocks the premium share extension, larger batch cleaning, and custom strip controls.")
+                .font(.caption2)
+                .foregroundStyle(Color("TextSecondary").opacity(0.85))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+    }
+
+    // MARK: - Idle state (iPhone) — hero repaint (point 3)
     private var idleView: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 0) {
             Spacer()
 
-            Image("EmptyNoPhotos")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 180, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-
-            VStack(spacing: 8) {
-                Text("Select photos or videos to scan")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color("TextPrimary"))
-
-                Text("See what hidden data your media reveal")
-                    .font(.subheadline)
-                    .foregroundStyle(Color("TextSecondary"))
+            // Hero header
+            VStack(spacing: 6) {
+                Text("ExifArmor")
+                    .font(.kataDisplay(28))
+                    .foregroundStyle(Color.kataIce)
+                Text("Nothing personal leaves with your photos.")
+                    .font(.kataBody(14))
+                    .foregroundStyle(Color.kataGold.opacity(0.7))
+                    .multilineTextAlignment(.center)
             }
+            .padding(.bottom, 32)
 
-            Button {
-                showPhotoPicker = true
-            } label: {
-                Label("Choose Photos", systemImage: "photo.on.rectangle.angled")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color("AccentCyan"))
-                    .foregroundStyle(Color("BackgroundDark"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            // Card backing
+            VStack(spacing: 20) {
+                brandedEmptyState
+                kataPickerButton
+                if !store.isPro { freeStripCounter }
             }
-            .padding(.horizontal, 40)
-
-            if !store.isPro {
-                VStack(spacing: 6) {
-                    Text("\(freeTier.stripsRemaining) free strips remaining today")
-                        .font(.caption)
-                        .foregroundStyle(Color("TextSecondary"))
-
-                    Text("Pro unlocks the premium share extension, larger batch cleaning, and custom strip controls.")
-                        .font(.caption2)
-                        .foregroundStyle(Color("TextSecondary").opacity(0.85))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-            }
+            .padding(20)
+            .background(Color.kataSapphire.opacity(0.04))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.kataGold.opacity(0.3), lineWidth: 0.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 24)
 
             Spacer()
         }
     }
 
-    // MARK: - Loading
-
+    // MARK: - Loading (point 7 — KataProgressRing)
     private var loadingView: some View {
         VStack(spacing: 20) {
-            ProgressView(value: viewModel.effectiveProgress, total: Double(max(viewModel.totalCount, 1)))
-                .tint(Color("AccentCyan"))
-                .padding(.horizontal, 60)
+            let progress = viewModel.totalCount > 0
+                ? viewModel.effectiveProgress / Double(max(viewModel.totalCount, 1))
+                : 0.0
+            KataProgressRing(progress: progress, diameter: 56, lineWidth: 3)
 
-            Text(viewModel.statusMessage.isEmpty ? "Scanning \(viewModel.processedCount)/\(viewModel.totalCount) items…" : viewModel.statusMessage)
+            Text(viewModel.statusMessage.isEmpty
+                 ? "Scanning \(viewModel.processedCount)/\(viewModel.totalCount) items…"
+                 : viewModel.statusMessage)
                 .font(.subheadline)
                 .foregroundStyle(Color("TextSecondary"))
 
@@ -303,14 +305,13 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Stripping
-
+    // MARK: - Stripping (point 7 — KataProgressRing)
     private var strippingView: some View {
         VStack(spacing: 20) {
-            ProgressView(value: viewModel.effectiveProgress,
-                         total: Double(viewModel.totalCount))
-                .tint(Color("AccentCyan"))
-                .padding(.horizontal, 60)
+            let progress = viewModel.totalCount > 0
+                ? viewModel.effectiveProgress / Double(viewModel.totalCount)
+                : 0.0
+            KataProgressRing(progress: progress, diameter: 56, lineWidth: 3)
 
             Text(viewModel.statusMessage.isEmpty ? "Stripping metadata…" : viewModel.statusMessage)
                 .font(.subheadline)
@@ -323,31 +324,26 @@ struct HomeView: View {
     }
 
     // MARK: - Error
-
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.largeTitle)
-                .foregroundStyle(Color("WarningRed"))
-
+                .foregroundStyle(Color.kataGold)
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(Color("TextSecondary"))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-
-            Button("Try Again") {
-                viewModel.reset()
-            }
-            .buttonStyle(.bordered)
-            .tint(Color("AccentCyan"))
+            Button("Try Again") { viewModel.reset() }
+                .buttonStyle(.bordered)
+                .tint(Color.kataGold)
         }
     }
 
-    // MARK: - Actions
-
-    private func handleStrip() {
-        let count = viewModel.analyzedPhotos.count + (viewModel.stripOptions.includeVideos ? viewModel.analyzedVideos.count : 0)
+    // MARK: - Strip flow
+    private func handleStripTapped() {
+        let count = viewModel.analyzedPhotos.count
+            + (viewModel.stripOptions.includeVideos ? viewModel.analyzedVideos.count : 0)
         if !store.isPro && !freeTier.canStrip(isPro: false) {
             AnalyticsLogger.shared.log(.freeLimitReached)
             AnalyticsLogger.shared.log(.paywallShown, metadata: ["trigger": "free_limit"])
@@ -360,9 +356,13 @@ struct HomeView: View {
             showUpgradeSheet = true
             return
         }
+        showStripConfirm = true
+    }
 
+    private func executeStrip() {
+        let count = viewModel.analyzedPhotos.count
+            + (viewModel.stripOptions.includeVideos ? viewModel.analyzedVideos.count : 0)
         AnalyticsLogger.shared.log(.stripInitiated, metadata: ["count": "\(count)"])
-
         Task {
             await viewModel.stripAll()
             freeTier.recordStrips(count: viewModel.totalProcessedMediaCount, isPro: store.isPro)
@@ -376,6 +376,9 @@ struct HomeView: View {
                 fieldsRemoved: viewModel.totalFieldsRemoved,
                 hadGPS: viewModel.hadLocationData
             )
+            // Show ceremonial seal overlay
+            sealThumbnail = viewModel.stripResults.first?.cleanedImage
+            showSealSuccess = true
         }
     }
 
@@ -393,13 +396,10 @@ struct HomeView: View {
 }
 
 // MARK: - Share Sheet UIKit Wrapper
-
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
-
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
-
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

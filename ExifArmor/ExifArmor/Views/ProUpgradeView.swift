@@ -168,7 +168,7 @@ struct ProUpgradeView: View {
             } label: {
                 HStack {
                     if isPurchasing {
-                        ProgressView()
+                        KataProgressRing(progress: 0.8, diameter: 20, lineWidth: 2)
                             .accessibilityLabel("Purchasing in progress")
                             .tint(Color("BackgroundDark"))
                     }

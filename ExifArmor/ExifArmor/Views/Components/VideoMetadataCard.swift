@@ -80,8 +80,8 @@ private struct VideoPreview: View {
                     .fill(Color("CardBackground"))
                     .frame(height: 220)
                     .overlay {
-                        ProgressView()
-                            .tint(Color("AccentCyan"))
+                        KataProgressRing(progress: 0.7, diameter: 32, lineWidth: 2)
+                            
                     }
             }
         }

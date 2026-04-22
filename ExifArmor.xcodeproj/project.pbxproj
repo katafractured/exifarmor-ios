@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		EA000004000000000000CAFE /* KatafractStyle in Frameworks */ = {isa = PBXBuildFile; productRef = EA000002000000000000CAFE /* KatafractStyle */; };
 		BCD448952F709508003C74BE /* ExifArmorShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BCD4488B2F709508003C74BE /* ExifArmorShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -108,6 +109,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA000004000000000000CAFE /* KatafractStyle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -181,6 +183,7 @@
 			);
 			name = ExifArmor;
 			packageProductDependencies = (
+				EA000002000000000000CAFE /* KatafractStyle */,
 			);
 			productName = ExifArmor;
 			productReference = BCD448072F708AEC003C74BE /* ExifArmor.app */;
@@ -289,6 +292,9 @@
 			);
 			mainGroup = BCD447FE2F708AEC003C74BE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EA000001000000000000CAFE /* XCRemoteSwiftPackageReference KatafractStyle */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BCD448082F708AEC003C74BE /* Products */;
 			projectDirPath = "";
@@ -775,4 +781,24 @@
 /* End XCConfigurationList section */
 	};
 	rootObject = BCD447FF2F708AEC003C74BE /* Project object */;
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EA000001000000000000CAFE /* XCRemoteSwiftPackageReference KatafractStyle */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = https://github.com/katafract-io/KatafractStyle;
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EA000002000000000000CAFE /* KatafractStyle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EA000001000000000000CAFE /* XCRemoteSwiftPackageReference KatafractStyle */;
+			productName = KatafractStyle;
+		};
+/* End XCSwiftPackageProductDependency section */
+
 }
