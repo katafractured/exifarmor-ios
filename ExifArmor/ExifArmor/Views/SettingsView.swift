@@ -151,6 +151,17 @@ struct SettingsView: View {
                                 .foregroundStyle(Color("TextSecondary"))
                         }
                     }
+
+                    NavigationLink {
+                        AppGroupDiagnosticsView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "checklist")
+                                .foregroundStyle(Color("AccentCyan"))
+                            Text("App Group Diagnostics")
+                                .foregroundStyle(Color("TextPrimary"))
+                        }
+                    }
                 }
 
                 if !store.tipProducts.isEmpty {
