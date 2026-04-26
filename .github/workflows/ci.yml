@@ -19,7 +19,7 @@ jobs:
   # ── Privacy Lint ─────────────────────────────────────────────────────────────
   privacy-lint:
     name: Privacy Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, katafract-linux]
     steps:
       - uses: actions/checkout@v5
 
@@ -102,76 +102,3 @@ jobs:
           name: test-results
           path: test-results.xcresult
           retention-days: 14
-
-  # ── Upload to TestFlight (main branch + tags only) ────────────────────────────
-  upload:
-    name: Upload to TestFlight
-    runs-on: macos-latest
-    needs: [privacy-lint]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    env:
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Select Xcode (latest stable)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Install Python deps
-        run: pip3 install PyJWT requests --quiet --break-system-packages
-
-      - name: Compute next build number
-        run: |
-          set -euo pipefail
-          BUILD_NUMBER=$(python3 ci_scripts/next_build.py 6760979268)
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
-          echo "Build number: $BUILD_NUMBER"
-
-      - name: Set build number in project
-        run: |
-          set -euo pipefail
-          find . -name "project.pbxproj" -exec \
-            sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUMBER/g" {} +
-          echo "Set CURRENT_PROJECT_VERSION = $BUILD_NUMBER"
-
-      - name: Write ASC API key
-        run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-
-      - name: Archive (signed)
-        run: |
-          set -euo pipefail
-          xcodebuild archive \
-            -project ExifArmor.xcodeproj \
-            -scheme ExifArmor \
-            -destination "generic/platform=iOS" \
-            -archivePath build/ExifArmor.xcarchive \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=2SGGP65W6C \
-            -quiet
-
-      - name: Export and upload to TestFlight
-        run: |
-          set -euo pipefail
-          xcodebuild -exportArchive \
-            -archivePath build/ExifArmor.xcarchive \
-            -exportPath build/export \
-            -exportOptionsPlist ExportOptions.plist \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            -allowProvisioningUpdates
-
-      - name: Cleanup API key
-        if: always()
-        run: rm -f ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
