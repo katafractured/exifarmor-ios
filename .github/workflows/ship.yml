@@ -118,20 +118,14 @@ jobs:
 
           find . -name project.pbxproj -not -path "*/.git/*" -exec sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9][0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" {} +
 
-          BUMPED=0
-          while IFS= read -r f; do
-            OLD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$f" 2>/dev/null) || continue
-            if /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "$f" 2>/dev/null; then
-              NEW=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$f" 2>/dev/null)
-              if [ "$NEW" = "$BUILD_NUM" ]; then
-                echo "  bumped $f: $OLD -> $NEW"
-                BUMPED=$((BUMPED+1))
-              fi
-            fi
-          done < <(find . -name "*.plist" -not -path "*/build/*" -not -path "*/.build/*" -not -path "*/.git/*")
-          echo "Total plists bumped: $BUMPED"
-          if [ "$BUMPED" -eq 0 ]; then
-            echo "::error::No CFBundleVersion plists were bumped — check Info.plist path and contents"
+          # Bump all plist CFBundleVersion
+          find . -name "*.plist" -not -path "*/build/*" -not -path "*/.build/*" -not -path "*/.git/*" -exec /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" {} \; 2>/dev/null || true
+
+          # Verify: check if at least one plist has the new version
+          VERIFIED=$(find . -name "*.plist" -not -path "*/build/*" -not -path "*/.build/*" -not -path "*/.git/*" -exec /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" {} \; 2>/dev/null | grep -c "^$BUILD_NUM$" || echo 0)
+          echo "Plists bumped to version $BUILD_NUM: $VERIFIED"
+          if [ "$VERIFIED" -eq 0 ]; then
+            echo "::error::No CFBundleVersion plists were updated to $BUILD_NUM — check Info.plist path"
             exit 1
           fi
 
