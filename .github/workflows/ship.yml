@@ -97,16 +97,15 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APP_ID: ${{ secrets.APP_ID }}
         run: |
-          set +e
-          # Generate ASC JWT
-          JWT=$(python3 ~/runner-env/asc-jwt.py)
-          if [ -z "$JWT" ]; then
+          set -eo pipefail
+          JWT=$(python3 ~/runner-env/asc-jwt.py 2>&1 || true)
+          if [ -z "$JWT" ] || ! echo "$JWT" | grep -q '^ey'; then
             echo "::warning::ASC JWT generation failed, falling back to run-number-only bump"
             BUILD_NUM=$((GITHUB_RUN_NUMBER + 400))
           else
             ASC_MAX=$(curl -s -m 10 -H "Authorization: Bearer $JWT" \
               "https://api.appstoreconnect.apple.com/v1/builds?filter[app]=$APP_ID&sort=-version&limit=1&fields[builds]=version" \
-              | python3 -c 'import sys,json; d=json.load(sys.stdin).get("data") or [{}]; v=(d[0].get("attributes") or {}).get("version") or "0"; print(int(v) if v.isdigit() else 0)' 2>/dev/null)
+              | python3 -c 'import sys,json; d=json.load(sys.stdin).get("data") or [{}]; v=(d[0].get("attributes") or {}).get("version") or "0"; print(int(v) if v.isdigit() else 0)' 2>/dev/null || echo 0)
             ASC_MAX=${ASC_MAX:-0}
             RUN_BUILD=$((GITHUB_RUN_NUMBER + 400))
             if [ "$ASC_MAX" -ge "$RUN_BUILD" ]; then
@@ -116,10 +115,11 @@ jobs:
             fi
             echo "asc_max=$ASC_MAX run_based=$RUN_BUILD using=$BUILD_NUM"
           fi
-          # Bump all plist CFBundleVersion
-          find . -name "*.plist" -not -path "*/build/*" -not -path "*/.build/*" -exec /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" {} \; 2>/dev/null
+          # Bump pbxproj CURRENT_PROJECT_VERSION (required for all projects)
+          find . -name project.pbxproj -not -path "*/.git/*" -exec sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9][0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" {} +
+          # Bump any Info.plist CFBundleVersion entries (if they exist)
+          find . -name "*.plist" -not -path "*/build/*" -not -path "*/.build/*" -not -path "*/.git/*" -exec /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" {} \; 2>/dev/null || true
           echo "BUILD_NUM=$BUILD_NUM" >> "$GITHUB_ENV"
-          set -e
 
       - name: Clean
         run: xcodebuild -project ExifArmor.xcodeproj -scheme ExifArmor -destination "generic/platform=iOS" clean
