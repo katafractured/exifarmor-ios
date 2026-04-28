@@ -3,16 +3,15 @@
 project("./ExifArmor.xcodeproj")
 
 devices([
-  "iPhone 17 Pro Max",
-  "iPad Pro 13-inch (M5)"
+  "iPhone 16 Pro Max",
+  "iPad Pro 13-inch (M4)"
 ])
 
-ios_version("26.4")
+ios_version("18.5")
 
 languages(["en-US"])
 
-# UI test scheme name
-scheme("ExifArmorUITests")
+scheme("ExifArmorScreenshots")
 
 output_directory("./fastlane/screenshots")
 clear_previous_screenshots(true)
@@ -20,7 +19,7 @@ override_status_bar(true)
 override_status_bar_arguments("--time 9:41 --batteryState charged --batteryLevel 100")
 
 launch_arguments([
-  "--screenshots --skip-onboarding",
+  "--screenshots",
 ])
 
 skip_open_summary(true)
